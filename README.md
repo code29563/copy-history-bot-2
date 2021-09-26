@@ -9,7 +9,7 @@ This script is intended for copying messages from private channels to which you 
   - [Switching between clients and handling floodwaits](#Switching-between-clients-and-handling-floodwaits)
 - [Importance of using multiple clients](#Importance-of-using-multiple-clients)
 - [The caption added to messages](#The-caption-added-to-messages)
-- [How it works](#How-it-works)
+- [Handling FileReferenceExpiredError and MediaEmptyError with a user client](#Handling-FileReferenceExpiredError-and-MediaEmptyError-with-a-user-client)
 - [Other notes](#Other-notes)
 
 # Features
@@ -23,6 +23,7 @@ This script is intended for copying messages from private channels to which you 
 - Option to print each successfully copied message to a file
 
 # Getting started
+Example values are given in the .env file.
 
 1. Make an app with the Telegram API: [https://my.telegram.org/apps](https://my.telegram.org/apps) and fill in the API\_ID and API\_HASH environment variables in the .env file with the App api\_id and App api\_hash respectively.
 2. Choose which user clients you want to use to copy messages, and obtain Telethon session strings for each of them, e.g. using option 2 of [this script](https://github.com/code29563/Telethon-Pyrogram-session-strings).
