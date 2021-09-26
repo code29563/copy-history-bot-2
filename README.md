@@ -1,4 +1,4 @@
-# README for private channels
+# Copy-history-bot 2
 
 This script is intended for copying messages from private channels to which you don't have the ability to add bots as admins.
 
@@ -137,9 +137,9 @@ Not all messages accept a text component, but those that do include text message
 - If the message in the source channel had been forwarded from somewhere else, such that it had a 'Forwarded from: ' tag, then:
   - If the message was forwarded from an anonymous group admin, the next line is 'forwarded\_from\_chat\_ID: {ID} (supergroup)' where {ID} is the ID of the group from which it was forwarded
   - If the message was forwarded from a channel, the next line is 'forwarded\_from\_chat\_ID: ' followed by the ID of that channel, and the line after that is 'forwarded\_from\_message\_ID: ' followed by the ID of the original message in that channel
-  - If the message is forwarded from an individual user, even if that original message was sent in a group rather than a private chat, then:
-    - If the user allowed linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_ID: ' followed by the ID of the user
-    - Otherwise, if the user didn't allow linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_name: ' followed by the name of the user, as it appears in the 'Forwarded from: ' tag
+  - If the message is forwarded from an individual user/bot, even if that original message was sent in a group rather than a private chat, then:
+    - If it's a bot or if the user allowed linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_ID: ' followed by the ID of the user/bot
+    - Otherwise, if it's a user that didn't allow linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_name: ' followed by the name of the user, as it appears in the 'Forwarded from: ' tag
 	
   The next line is then 'forwarded\_from\_message\_date: ' followed by the date and time at which the original message was sent in the chat from which it was forwarded to the source channel. The format of the date is likewise 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
 
