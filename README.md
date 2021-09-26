@@ -23,7 +23,7 @@ This script is intended for copying messages from private channels to which you 
 - Option to print each successfully copied message to a file
 
 # Getting started
-Example values are given in the .env file.
+Example values for the .env file are given in example.env.
 
 1. Make an app with the Telegram API: [https://my.telegram.org/apps](https://my.telegram.org/apps) and fill in the API\_ID and API\_HASH environment variables in the .env file with the App api\_id and App api\_hash respectively.
 2. Choose which user clients you want to use to copy messages, and obtain Telethon session strings for each of them, e.g. using option 2 of [this script](https://github.com/code29563/Telethon-Pyrogram-session-strings).
