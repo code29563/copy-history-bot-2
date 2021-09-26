@@ -73,6 +73,7 @@ This may be one reason it's worth including as many user clients' session string
 If you're unable to get multiple user accounts to use, and the only account you have to use is one that you're not willing to get banned, then consider uncommenting 'await asyncio.sleep(2)' in the script to wait 2 seconds (or replace 2 with another number as you see fit) between switching from a bot client to a user client to send a message, the overall effect being that the messages sent by the user client are spaced out more and the rate at which it sends messages are decreased, possibly decreasing the likelihood of getting banned.
 
 # How it works
+The script is profusely commented to explain some of the technical implementation, but the comments are naturally structured according to the code. What follows is an attempt to explain in more natural language the ideas behind the code.
 
 For each stream, the user clients all concurrently retrieve the messages to be copied. Each user client retrieves all the messages to be copied so it has its own version of the Message object with its own access hash. When just some portion of the messages to be copied has been retrieved by all user clients, those messages start to get copied to the destination channel, whilst the rest of the messages are still being retrieved. No attempt is made to copy a message until all user clients have retrieved it.
 
