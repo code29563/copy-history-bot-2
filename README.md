@@ -25,7 +25,7 @@ This script is intended for copying messages from private channels to which you 
 
 	The minimum number of session strings required is 1.
 
-1. Fill in the BOT\_TOKENS environment variable with the bot tokens of the bots that you want to use to copy messages (you can make bots using @BotFather), following the same syntax as for the SESSION\_STRINGS environment variable.
+3. Fill in the BOT\_TOKENS environment variable with the bot tokens of the bots that you want to use to copy messages (you can make bots using @BotFather), following the same syntax as for the SESSION\_STRINGS environment variable.
 
 	I recommend using around 17 bots, which should be enough to completely avoid unnecessary floodwaits from the bot clients. To make this many bots, you might have to stagger it over a few days as @BotFather could limit the number of bots you make in a single day.
 
@@ -33,13 +33,13 @@ This script is intended for copying messages from private channels to which you 
 
 	The minimum number of bot tokens required is 1.
 
-1. Fill in the CLONE\_SREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source channel from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination chat to which to copy those messages. You can list multiple streams in the CLONE\_SREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
+4. Fill in the CLONE\_SREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source channel from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination chat to which to copy those messages. You can list multiple streams in the CLONE\_SREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
 
 	The source channel ID and message IDs can simply be obtained by right-clicking a message in the Telegram app and copying it's link, then paste it somewhere. The number after the final forward slash is the message ID, and the number before it is the channel ID, but append -100 to it before inserting it in CLONE\_SREAMS. You can also find the channel ID through other means like with @username\_to\_id\_bot.
 
-1. Make sure all the user clients are subscribed to the channel from which messages are to be copied, and make sure both the user clients and bot clients are all able to send messages to the destination to which the messages are to be copied, i.e. they should be admins if it's a channel, or members if it's a group, or if it's an individual user they should be able to send private messages to them.
-2. If you want to print the Message object of each successfully copied message to a file, set the PRINT_TO_FILE environment variable to "1". The printed object contains various details of the message not present in the (already detailed) caption.
-2. Run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
+5. Make sure all the user clients are subscribed to the channel from which messages are to be copied, and make sure both the user clients and bot clients are all able to send messages to the destination to which the messages are to be copied, i.e. they should be admins if it's a channel, or members if it's a group, or if it's an individual user they should be able to send private messages to them.
+6. If you want to print the Message object of each successfully copied message to a file, set the PRINT_TO_FILE environment variable to "1". The printed object contains various details of the message not present in the (already detailed) caption.
+7. Run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
 
 # Background
 
