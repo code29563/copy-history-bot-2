@@ -6,7 +6,7 @@ This script is intended for copying messages from private channels to which you 
 - [Getting started](#Getting-started)
 - [Background](#Background)
 - [How it works](#How-it-works)
-  - [Switching between clients and handling floodwaits](##Switching-between-clients-and-handling-floodwaits)
+  - [Switching between clients and handling floodwaits](#Switching-between-clients-and-handling-floodwaits)
 - [Importance of using multiple clients](#Importance-of-using-multiple-clients)
 - [The caption added to messages](#The-caption-added-to-messages)
 - [How it works](#How-it-works)
