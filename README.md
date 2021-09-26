@@ -2,9 +2,19 @@
 
 This script is intended for copying messages from private channels to which you don't have the ability to add bots as admins.
 
+- [Features](#Features)
+- [Getting started](#Getting-started)
+- [Background](#Background)
+- [How it works](#How-it-works)
+  - [Switching between clients and handling floodwaits](##Switching-between-clients-and-handling-floodwaits)
+- [Importance of using multiple clients](#Importance-of-using-multiple-clients)
+- [The caption added to messages](#The-caption-added-to-messages)
+- [How it works](#How-it-works)
+- [Other notes](#Other-notes)
+
 # Features
 
-- Messages are copied to the destination chat without the 'Forwarded from:' tag
+- Messages are copied to the destination channel without the 'Forwarded from:' tag
 - Dynamically switching between clients when encountering floodwaits, to avoid having to wait them out and increase the average rate at which messages are sent
 - Uses bot clients to send messages wherever possible, to reduce the number of messages sent by user clients which are vulnerable to bans
 - Adds a detailed caption to copied messages, giving various details about the original message
@@ -33,11 +43,11 @@ This script is intended for copying messages from private channels to which you 
 
 	The minimum number of bot tokens required is 1.
 
-4. Fill in the CLONE\_SREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source channel from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination chat to which to copy those messages. You can list multiple streams in the CLONE\_SREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
+4. Fill in the CLONE\_SREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source channel from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination channel to which to copy those messages. You can list multiple streams in the CLONE\_SREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
 
-	The source channel ID and message IDs can simply be obtained by right-clicking a message in the Telegram app and copying it's link, then paste it somewhere. The number after the final forward slash is the message ID, and the number before it is the channel ID, but append -100 to it before inserting it in CLONE\_SREAMS. You can also find the channel ID through other means like with @username\_to\_id\_bot.
+	The channel IDs and message IDs can simply be obtained by right-clicking a message in the Telegram app and copying it's link, then paste it somewhere. The number after the final forward slash is the message ID, and the number before it is the channel ID, but append -100 to it before inserting it in CLONE\_SREAMS. You can also find the channel ID through other means like with @username\_to\_id\_bot.
 
-5. Make sure all the user clients are subscribed to the channel from which messages are to be copied, and make sure both the user clients and bot clients are all able to send messages to the destination to which the messages are to be copied, i.e. they should be admins if it's a channel, or members if it's a group, or if it's an individual user they should be able to send private messages to them.
+5. Make sure all the user clients are subscribed to the channel from which messages are to be copied, and make sure both the user clients and bot clients are admins in the destination channel to which messages are to be copied.
 6. If you want to print the Message object of each successfully copied message to a file, set the PRINT_TO_FILE environment variable to "1". The printed object contains various details of the message not present in the (already detailed) caption.
 7. Run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
 
@@ -63,7 +73,7 @@ If you're unable to get multiple user accounts to use, and the only account you 
 
 # How it works
 
-For each stream, the user clients all concurrently retrieve the messages to be copied. Each user client retrieves all the messages to be copied so it has its own version of the Message object with its own access hash. When just some portion of the messages to be copied has been retrieved by all user clients, those messages start to get copied to the destination chat, whilst the rest of the messages are still being retrieved. No attempt is made to copy a message until all user clients have retrieved it.
+For each stream, the user clients all concurrently retrieve the messages to be copied. Each user client retrieves all the messages to be copied so it has its own version of the Message object with its own access hash. When just some portion of the messages to be copied has been retrieved by all user clients, those messages start to get copied to the destination channel, whilst the rest of the messages are still being retrieved. No attempt is made to copy a message until all user clients have retrieved it.
 
 Each user client is assigned a list in which it stores the messages it retrieves. All these lists should turn out identical in the messages they contain (even if the Message objects differ due to differing access hashes), because all user clients are retrieving the same messages. So the message at any particular position k in the list of one user client should have the same ID as the message at that same position k in the list of any of the other user clients. If that doesn't turn out to be the case, it seems some of the messages to be retrieved were deleted from the source channel during the process, such that some user clients ended up retrieving them and others didn't.
 
