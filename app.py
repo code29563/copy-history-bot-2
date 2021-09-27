@@ -84,7 +84,7 @@ async def copy_message(message,client,to): #defining a function which is used re
     """copy the given message to the destination with the appropriate added text/caption"""
     string = '\n\nchat_ID: ' + str(message.chat_id) + '\nmessage_ID: ' + str(message.id) #initialising the string to be added to the text/caption of the copied message
     if message.edit_date: #if the message is a previous message edited, then edit_date is the date of the most recent edit, which is what I want to output
-        date = message.edit_date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        date = message.edit_date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') #converts the date from UNIX time to a more readable format
         string += ' (a_previous_message_edited)' + '\ndate: ' + date
     else: #i.e. if the message is brand new
         date = message.date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
@@ -95,9 +95,9 @@ async def copy_message(message,client,to): #defining a function which is used re
         fdate = message.fwd_from.date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')   
         if message.forward._sender_id: #in which case I think the 'Forwarded from:' tag contains a user's or bot's name (even if their original message was sent in a group rather than a private chat) and if it's a user then they have allowed linking to their account when forwarding their messages
             string += '\nforwarded_from_user_ID: ' + str(message.forward._sender_id) + '\nforwarded_from_message_date: ' + fdate
-        elif message.fwd_from.from_name: #in which case I think is the 'Forwarded from:' tag contains a user's name (even if their original message was sent in a group rather than a private chat) and in this case the user didn't allow linking to their account when forwarding their messages
+        elif message.fwd_from.from_name: #in which case I think the 'Forwarded from:' tag contains a user's name (even if their original message was sent in a group rather than a private chat) and in this case the user didn't allow linking to their account when forwarding their messages
             string += '\nforwarded_from_user_name: ' + str(message.fwd_from.from_name) + '\nforwarded_from_message_date: ' + fdate
-        elif message.forward._chat.megagroup or (hasattr(message.forward._chat,'gigagroup') and message.forward._chat.gigagroup): #I think regular groups have the type as 'supergroup' after Telegram merged their properties. Using hasattr for gigagroup because when dealing with an inaccessible channel (ChannelForbidden object) I got an AttributeError when using just 'if message.forward._chat.gigagroup' as the object didn't have the 'gigagroup' attribute
+        elif message.forward._chat.megagroup or (hasattr(message.forward._chat,'gigagroup') and message.forward._chat.gigagroup): #Using hasattr for gigagroup because when dealing with an inaccessible channel (ChannelForbidden object) I got an AttributeError when using just 'if message.forward._chat.gigagroup' as the object didn't have the 'gigagroup' attribute
             string += '\nforwarded_from_chat_ID: ' + '-100' + str(message.fwd_from.from_id.channel_id) + ' (supergroup)\nforwarded_from_message_date: ' + fdate #it seems the message is forwarded from an anonymous group admin
         elif message.fwd_from.from_id.channel_id: #in which case, with neither ._chat.megagroup nor ._chat.megagroup being 'true, I think it's forwarded from a channel, in which case the ID of the original message is also accessible
             string += '\nforwarded_from_chat_ID: ' + '-100' + str(message.fwd_from.from_id.channel_id) + '\nforwarded_from_message_ID: ' + str(message.forward.channel_post) + '\nforwarded_from_message_date: ' + fdate
@@ -115,7 +115,7 @@ async def copy_message(message,client,to): #defining a function which is used re
                 a = await client.send_message(to,message)
                 await client.send_message(to,string[2:],reply_to=a) #remove the line breaks at the beginning of the above string, as it's not being added to previously existing text so nothing to separate it from
         elif message.message: #media that already has a caption
-            if len(message.message + string) <= 1024:    
+            if len(message.message + string) <= 1024: #to ensure it doesn't go above the limit for captions on media messages, which I think is 1024 characters
                 message.message += string #adding the above string to the caption of the message
                 await client.send_message(to,message)
             else:
