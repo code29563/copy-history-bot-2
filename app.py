@@ -17,10 +17,10 @@ run = os.environ.get("RUN") #indicating the number of times the script has been 
 
 logging.basicConfig(format='[%(asctime)s --- run {} --- %(filename)s line %(lineno)d --- %(levelname)s] --- %(message)s'.format(run), level=logging.INFO) #for detailed logging
 
-str1 = os.environ.get("CLONE_STREAMS") #loading the environment variable "CLONE_STREAMS" to a variable str1
-str2 = str1.split(";") #splitting at the semi-colons ; which is used as the separator between different clone streams
-str3 = ["[" + x + "]" for x in str2] #enclosing each of the clone streams in square brackets
-str4 = ','.join(str3) #joining the clone streams together, separated by commas
+str1 = os.environ.get("STREAMS") #loading the environment variable "STREAMS" to a variable str1
+str2 = str1.split(";") #splitting at the semi-colons ; which is used as the separator between different streams
+str3 = ["[" + x + "]" for x in str2] #enclosing each of the streams in square brackets
+str4 = ','.join(str3) #joining the streams together, separated by commas
 str5 = "[" + str4 + "]" #enclosing the entire thing in square brackets, which is relevant for correct recognition as a list of a list when there is only one stream
 cs = ast.literal_eval(str5) #converting the string into an array
 print(cs)
@@ -176,7 +176,7 @@ def restart(i,ID):
     cs1 = [[str(u) for u in x] for x in cs[i:]]
     cs2 = [','.join(x) for x in cs1]
     str1 = ';'.join(cs2)
-    os.environ["CLONE_STREAMS"] = str1 #update the CLONE_STREAMS environment variable, removing all clone streams which have been copied over in this run of the script
+    os.environ["STREAMS"] = str1 #update the STREAMS environment variable, removing all streams which have been copied over in this run of the script
     os.environ["RUN"] = str(int(run) + 1) #increment the run of the script by 1
     os.execv(sys.executable, ['python3'] + sys.argv) #restart the script
 
@@ -261,7 +261,7 @@ async def main1(i,s):
                         t = tu
                         m = 50
                         msg.message = bmsg #restore the message's text from the backup copy in case it's been modified when adding the caption
-                        await asyncio.sleep(2)
+                        #await asyncio.sleep(2)
                         continue #to the next iteration of the while loop to try sending the message with a user client this time
                     except errors.rpcerrorlist.FileReferenceExpiredError:
                         logging.info('FileReferenceExpiredError encountered on message {}'.format(msg.id))
@@ -294,11 +294,11 @@ l[0].loop.run_until_complete(start_clients())
 if os.environ.get("PRINT_TO_FILE") == '1':
     p2f = True
     with open('msgs.txt','a+',encoding='utf-8') as file:
-        for i,s in enumerate(cs): #copying the clone streams successively, one after the other, in the order given in the environment variable
+        for i,s in enumerate(cs): #copying the streams successively, one after the other, in the order given in the environment variable
             b[0].loop.run_until_complete(main1(i,s))
-            h = [[] for y in l] #re-initialising the array h to be populated by the messages of the next clone stream
+            h = [[] for y in l] #re-initialising the array h to be populated by the messages of the next stream
 else:
     p2f = False
-    for i,s in enumerate(cs): #copying the clone streams successively, one after the other, in the order given in the environment variable
+    for i,s in enumerate(cs): #copying the streams successively, one after the other, in the order given in the environment variable
         b[0].loop.run_until_complete(main1(i,s))
-        h = [[] for y in l] #re-initialising the array h to be populated by the messages of the next clone stream
+        h = [[] for y in l] #re-initialising the array h to be populated by the messages of the next stream
