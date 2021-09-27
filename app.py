@@ -27,7 +27,7 @@ print(cs)
 
 str1 = os.environ.get("SESSION_STRINGS") #all of which are for user clients
 str2 = str1.replace("\n","") #remove any line breaks
-ss = str2.split(",") #each session string is separated by a comma
+ss = str2.split(",") #session strings are separated from each other by a comma
 #print(ss)
 
 apiid = os.environ.get("API_ID")
