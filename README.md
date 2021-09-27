@@ -1,6 +1,6 @@
 # Copy-history-bot 2
 
-This script is intended for copying messages from private channels to which you don't have the ability to add bots as admins.
+This script is intended for copying messages from private channels to which you don't have the ability to add bots as admins. For public channels, or private channels to which you can add bots as admins, use [my other script](https://github.com/code29563/copy-history-bot-1).
 
 - [Features](#Features)
 - [Getting started](#Getting-started)
@@ -65,7 +65,7 @@ Some media objects don't seem to require a client-specific access hash, includin
 
 For those media objects that do require an access hash, the remaining option is therefore to copy them with user clients that are subscribed to the channel and hence have access to its messages.
 
-However, user clients are at risk of getting banned if they send a lot of requests. Multiple people have mentioned this and I myself have experienced this with 7 accounts getting banned, all of which were accounts made relatively recently though, whereas I didn't experience the same with some of my older accounts even when sending the same number of messages, so it's possible that for a recently created account to start sending lots of messages as one of the first things it does is considered suspicious activity by Telegram's system and receives an automatic ban.
+This faces an issue that [my other script](https://github.com/code29563/copy-history-bot-1) didn't face: user clients are at risk of getting banned if they send a lot of requests. Multiple people have mentioned this and I myself have experienced this with 7 accounts getting banned, all of which were accounts made relatively recently though, whereas I didn't experience the same with some of my older accounts even when sending the same number of messages, so it's possible that for a recently created account to start sending lots of messages as one of the first things it does is considered suspicious activity by Telegram's system and receives an automatic ban.
 
 To mitigate this at least partly, in this script, an attempt is made to copy each message with a bot client first, in case it is a text message or a media message that can be copied by a bot. If that fails with a MediaEmptyError, indicating that it's a media type that can't be copied with a bot due to the access hash issue mentioned above, then the message is copied with a user client.
 
