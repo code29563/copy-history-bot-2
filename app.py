@@ -192,6 +192,8 @@ tu = [0 for i in l]
 tb = [0 for i in b]
 #x and c above are intialised as single-element lists so that updates to x and c (see below) are reflected in them too
 
+sl = os.environ.get('SLEEP')
+
 async def main1(i,s):
     for j,user in enumerate(l):
         asyncio.create_task(main(i,s,j,user)) #all user client concurrently start retrieving the messages to be copied
@@ -261,14 +263,14 @@ async def main1(i,s):
                         t = tu
                         m = 50
                         msg.message = bmsg #restore the message's text from the backup copy in case it's been modified when adding the caption
-                        #await asyncio.sleep(2)
+                        await asyncio.sleep(sl)
                         continue #to the next iteration of the while loop to try sending the message with a user client this time
                     except errors.rpcerrorlist.FileReferenceExpiredError:
                         logging.info('FileReferenceExpiredError encountered on message {}'.format(msg.id))
                         restart(i,msg.id) #restart the script
                         #await asyncio.sleep(2)
                         continue
-                    logging.info('successfully copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
+                    #logging.info('successfully copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
                     break #the 'try:' statement executed successfully and the while loop needs to be broken manually
                 if p2f:
                     print('',file=file) #a blank line to separate messages

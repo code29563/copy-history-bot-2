@@ -24,7 +24,7 @@ This script is intended for copying messages from private channels to which you 
 - Option to print each successfully copied message to a file
 
 # Getting started
-Example values for the .env file are given in example.env.
+The environment variables are to be given in a .env file. An example is shown in example.env.
 
 1. Make an app with the Telegram API: [https://my.telegram.org/apps](https://my.telegram.org/apps) and fill in the API\_ID and API\_HASH environment variables in the .env file with the App api\_id and App api\_hash respectively.
 2. Choose which user clients you want to use to copy messages, and obtain Telethon session strings for each of them, e.g. using option 2 of [this script](https://github.com/code29563/Telethon-Pyrogram-session-strings).
@@ -32,6 +32,8 @@ Example values for the .env file are given in example.env.
    Generally, the more clients you use, the better. Due to the risk of a client getting banned, and especially when the number of messages you want to copy is large (in the thousands), it's worth only using clients that you can tolerate getting banned rather than e.g. your personal account with which you communicate with people. It may also be worth using older accounts rather than recently made accounts, due to the possibility that the latter are more likely to get banned.
 
 	Once you've got the session strings, list them in the SESSION\_STRINGS environment variable, comma-separated. You can split them onto multiple lines if you want. Ensure you don't put a comma on the end of the last session string listed.
+	
+	The environment variable SLEEP is the number of seconds to wait before attempting to copy a message with a user client. If you're unable to get multiple user accounts to use, and the only account you have to use is one that you're not willing to get banned, then consider changing the value of SLEEP to e.g. 2, the overall effect being that the messages sent by the user client are spaced out more and the rate at which it sends messages are decreased, possibly decreasing the likelihood of getting banned. Otherwise keep it at 0 to copy messages at as high a rate as possible.
 
 	The user clients don't have to include the one with which the API ID and Hash were obtained.
 
@@ -70,8 +72,6 @@ This faces an issue that [my other script](https://github.com/code29563/copy-his
 To mitigate this at least partly, in this script, an attempt is made to copy each message with a bot client first, in case it is a text message or a media message that can be copied by a bot. If that fails with a MediaEmptyError, indicating that it's a media type that can't be copied with a bot due to the access hash issue mentioned above, then the message is copied with a user client.
 
 This may be one reason it's worth including as many user clients' session strings as you can when using the script, to split the job of sending messages amongst more users so each individual user is sending less messages, and hence perhaps less likely to get banned.
-
-If you're unable to get multiple user accounts to use, and the only account you have to use is one that you're not willing to get banned, then consider uncommenting 'await asyncio.sleep(2)' in the script to wait 2 seconds (or replace 2 with another number as you see fit) between switching from a bot client to a user client to send a message, the overall effect being that the messages sent by the user client are spaced out more and the rate at which it sends messages are decreased, possibly decreasing the likelihood of getting banned.
 
 # How it works
 The script is profusely commented to explain some of the technical implementation, but the comments are naturally structured according to the code. What follows is an attempt to explain in more natural language the ideas behind the code.
