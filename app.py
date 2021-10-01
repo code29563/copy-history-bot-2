@@ -23,7 +23,7 @@ str3 = ["[" + x + "]" for x in str2] #enclosing each of the streams in square br
 str4 = ','.join(str3) #joining the streams together, separated by commas
 str5 = "[" + str4 + "]" #enclosing the entire thing in square brackets, which is relevant for correct recognition as a list of a list when there is only one stream
 cs = ast.literal_eval(str5) #converting the string into an array
-print(cs)
+#print(cs)
 
 str1 = os.environ.get("SESSION_STRINGS") #all of which are for user clients
 str2 = str1.replace("\n","") #remove any line breaks
