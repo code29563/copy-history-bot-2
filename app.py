@@ -70,7 +70,8 @@ async def main(i,s,j,user):
 
 def err_msgs(k,lid):
     """called when the messages at position k in the lists of messages don't all have the same ID (or aren't all 'finished')"""
-    logging.info('It seems some of the messages to be copied of stream {0} might have been deleted whilst the user clients were retrieving them. Re-run the script if you still want to continue'.format(i+1))
+    logging.info('It seems some of the messages to be copied of stream {0} might have been deleted whilst the user clients were retrieving them. Update the STREAMS environment variable and re-run the script if you still want to continue.'.format(i+1))
+    logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid))
     for j,v in enumerate(h):
         if v[k] == 'finished':
             p = k-1
@@ -121,7 +122,7 @@ async def copy_message(message,client,to): #defining a function which is used re
             else:
                 a = await client.send_message(to,message)
                 await client.send_message(to,string[2:],reply_to=a)
-        else:
+        else: #if it doesn't already have a caption, make the above string its caption
             message.message = string[2:]
             await client.send_message(to,message)
     else:
