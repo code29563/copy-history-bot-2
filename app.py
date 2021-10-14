@@ -193,7 +193,7 @@ tu = [0 for i in l]
 tb = [0 for i in b]
 #x and c above are intialised as single-element lists so that updates to x and c (see below) are reflected in them too
 
-sl = os.environ.get('SLEEP')
+sl = float(os.environ.get('SLEEP'))
 
 async def main1(i,s):
     for j,user in enumerate(l):
