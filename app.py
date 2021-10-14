@@ -228,18 +228,18 @@ async def main1(i,s):
                 bmsg = msg.message #make a backup copy of the retrieved message's text
                 #first try sending the message with the current bot client:
                 ct = 'bot'
-                x = xu
-                cl = l
-                w = wu
-                c = cu
-                t = tu
+                x = xb
+                cl = b
+                w = wb
+                c = cb
+                t = tb
                 m = 5 #the maximum number of messages a bot client should send before moving onto a different bot client
                 while True: #infinite looping; this is to try again for this message after handling any exceptions
                     try:
                         #logging.info('attempting to copy message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
                         await copy_message(msg,cl[x[0]],to) #copying the message to the destination chat
                         lid = msg.id #if the message was copied without error, this line runs to update the ID of the last copied message
-                        #logging.info('{0} bot {1}'.format(msg.message_id,x+1))
+                        #logging.info('copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
                     except errors.FloodWaitError as e:
                         te = time.time() #the current time at which the floodwait has occurred
                         wait = e.seconds #the required wait time
