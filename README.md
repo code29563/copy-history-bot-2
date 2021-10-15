@@ -164,3 +164,13 @@ To handle both these errors, the script updates the STREAMS environment variable
 # Other notes
 
 If you cancel the script whilst it's running (e.g. using Ctrl+C), a message is output to the terminal giving the ID of the last copied message of the stream that was being copied at the time. Depending on when exactly you cancel the script, is a possibility that another message has successfully been copied, such that the ID output to the terminal is actually the ID of the penultimate message to have been copied, so you may want to confirm this yourself before using the ID output to the terminal to e.g. update the STREAMS environment variable for the next time you manually run the script to pick up where it left off.
+
+# Possible Improvements
+- Add full support for copying messages to/from groups, supergroups, and private chats
+- Hence add support for using usernames, phone numbers, exact names, invite links, etc, rather than just chat IDs in the .env file (maybe using an [input entity](https://docs.telethon.dev/en/latest/modules/client.html#telethon.client.users.UserMethods.get_input_entity))
+- Skip over messages deleted from the source channel instead of terminating the script
+- Add the option to use only user clients (like when it's known all the messages to be copied are media messages with hashes), and the option to use only bot clients (for public channels or private channels in which they're admins), the latter potentially doing away with the need for [a separate script](https://github.com/code29563/copy-history-bot-1)
+- Add the option to switch to user clients when all the bot clients have a floodwait
+- Set the RUN environment variable within the script rather than the .env file
+- Make the caption optional
+- Stylistic issues: clearer variable names; make a class for the two client types with parameters to replace the client-specific lists.
