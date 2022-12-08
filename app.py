@@ -5,7 +5,8 @@ import ast
 from telethon import TelegramClient,errors
 from telethon.sessions import StringSession
 from datetime import timezone
-from telethon.tl.types import MessageMediaWebPage,MessageService
+from telethon.tl.types import MessageMediaWebPage,MessageService,KeyboardButtonUrlAuth,ReplyInlineMarkup
+from telethon.tl.custom.button import Button
 import time
 import sys
 import signal
@@ -52,14 +53,14 @@ async def main(i,s,j,user):
     v = sid
     while True: #infinite looping; this is to try again after waiting out any floodwait error encountered
         await asyncio.sleep(0) #yield control to the event loop momentarily, allowing other tasks (e.g. copying over already-retrieved messages) to be run
-        y = v #the first message to be retrieved in this iteration of the while loop has ID y-1
+        y = v #the first message to be retrieved in this iteration of the while loop has ID y
         try:
             async for q in user.iter_messages(fro,min_id=y-1,max_id=eid+1,wait_time=0,reverse=True): #iterating over the messages to be retrieved
                 h[j].append(q) #append each retrieved message to the list of 'user'
                 y = q.id #update y to the ID of the message just retrieved
                 #logging.info(y)
         except errors.FloodWaitError as e:
-            if y != v: #in which case it seems some successful iterations have just run so y has been updated to the ID of the last message retrieved by the user client, as opposed to if y==v, in which case the floodwait seems to have occurred upon attempting to retrieve the first message in the loop, so y is still the ID of the first message to be retrieved by this user client
+            if y != v: #in which case it seems some successful iterations have just run so y has been updated to the ID of the last message retrieved by the user client, as opposed to if y==v, in which case the floodwait seems to have occurred upon attempting to retrieve the first message in the loop, so y is still the ID of the first message yet to be retrieved by this user client
                 v = y+1 #so the next message for this user client to retrieve has ID y+1
             logging.info('FloodWait error encountered on user client {0} while retrieving messages of stream {1}; sleeping {2} seconds'.format(j+1,i+1,e.seconds))
             await asyncio.sleep(e.seconds)
@@ -81,8 +82,22 @@ def err_msgs(k,lid):
         logging.info('The ID of the this message (after which this error has appeared) of stream {0} retrieved by user client {1} was {2}'.format(i+1,j+1,v[p].id))
     sys.exit(0)
 
-async def copy_message(message,client,to): #defining a function which is used repeatedly later in the code
+async def copy_message(message,client,to,ct): #defining a function which is used repeatedly later in the code
     """copy the given message to the destination with the appropriate added text/caption"""
+        
+    if type(message.reply_markup) == ReplyInlineMarkup: #checking if the message has reply_markup and if so, then is it inline keyboard buttons
+        #print(print(message.reply_markup.__dict__))
+        for row in message.reply_markup.rows: #iterating through each row of buttons
+            #print(row.__dict__)
+            for i in range(len(row.buttons)): #iterating through the button in each row
+                if type(row.buttons[i]) == KeyboardButtonUrlAuth: #change any login urls to regular urls
+                    #print(row.buttons[i].__dict__)
+                    row.buttons[i] = Button.url(text = row.buttons[i].text, url = row.buttons[i].url)
+                    #print(row.buttons[i].__dict__)
+    
+    if message.buttons and ct == 'user':
+        buts = message.buttons
+    
     string = '\n\nchat_ID: ' + str(message.chat_id) + '\nmessage_ID: ' + str(message.id) #initialising the string to be added to the text/caption of the copied message
     if message.edit_date: #if the message is a previous message edited, then edit_date is the date of the most recent edit, which is what I want to output
         date = message.edit_date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') #converts the date from UNIX time to a more readable format
@@ -111,27 +126,41 @@ async def copy_message(message,client,to): #defining a function which is used re
         if type(message.media) == MessageMediaWebPage: #a media type, but not subject to the 1024 character restriction
             if len(message.message + string) <= 4096: #to ensure it doesn't go above the limit for text messages, which I think is 4096 characters
                 message.message += string #adding the above string to the text of the message
-                await client.send_message(to,message) #copy the message (not forward) to the destination chat
+                a = await client.send_message(to,message) #copy the message (not forward) to the destination chat
+                if message.buttons and ct == 'user':
+                    await b[xb[0]].edit_message(a,buttons=buts)
             else: #if the combined string would be over the limit for text messages, send the message without the added string and send the string as a reply to it
                 a = await client.send_message(to,message)
                 await client.send_message(to,string[2:],reply_to=a) #remove the line breaks at the beginning of the above string, as it's not being added to previously existing text so nothing to separate it from
+                if message.buttons and ct == 'user':
+                    await b[xb[0]].edit_message(a,buttons=buts)
         elif message.message: #media that already has a caption
             if len(message.message + string) <= 1024: #to ensure it doesn't go above the limit for captions on media messages, which I think is 1024 characters
                 message.message += string #adding the above string to the caption of the message
-                await client.send_message(to,message)
+                a = await client.send_message(to,message)
+                if message.buttons and ct == 'user':
+                    await b[xb[0]].edit_message(a,buttons=buts)
             else:
                 a = await client.send_message(to,message)
                 await client.send_message(to,string[2:],reply_to=a)
+                if message.buttons and ct == 'user':
+                    await b[xb[0]].edit_message(a,buttons=buts)
         else: #if it doesn't already have a caption, make the above string its caption
             message.message = string[2:]
-            await client.send_message(to,message)
+            a = await client.send_message(to,message)
+            if message.buttons and ct == 'user':
+                await b[xb[0]].edit_message(a,buttons=buts)
     else:
         if len(message.message + string) <= 4096:
             message.message += string
             await client.send_message(to,message) 
+            if message.buttons and ct == 'user':
+                await b[xb[0]].edit_message(a,buttons=buts)
         else:
             a = await client.send_message(to,message)
             await client.send_message(to,string[2:],reply_to=a)
+            if message.buttons and ct == 'user':
+                await b[xb[0]].edit_message(a,buttons=buts)
 
 async def move(x,w,ct,t=None,id=None,f=False,f3=False):
     """To move to the next client, which is the client with the lowest remaining floodwait, or if 'f3=True' then the client with no remaining floodwait that maxxed out its counter longest ago
@@ -196,6 +225,8 @@ tb = [0 for i in b]
 sl = float(os.environ.get('SLEEP'))
 
 async def main1(i,s):
+    #await b[0].send_message(-1001506400182,'--------')
+    #sys.exit(0)
     for j,user in enumerate(l):
         asyncio.create_task(main(i,s,j,user)) #all user client concurrently start retrieving the messages to be copied
     lid = 0 #the ID of the last copied message; initialised as 0 to indicate no message has been copied yet
@@ -237,7 +268,7 @@ async def main1(i,s):
                 while True: #infinite looping; this is to try again for this message after handling any exceptions
                     try:
                         #logging.info('attempting to copy message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
-                        await copy_message(msg,cl[x[0]],to) #copying the message to the destination chat
+                        await copy_message(msg,cl[x[0]],to,ct) #copying the message to the destination chat
                         lid = msg.id #if the message was copied without error, this line runs to update the ID of the last copied message
                         #logging.info('copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
                     except errors.FloodWaitError as e:

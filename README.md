@@ -1,6 +1,8 @@
 # Copy-history-bot 2
 
-This script is intended for copying messages from private channels to which you don't have the ability to add bots as admins. For public channels, or private channels to which you can add bots as admins, use [my other script](https://github.com/code29563/copy-history-bot-1).
+This script is intended for copying messages from private chats and groups, to which you don't have the ability to add bots as admins. For public chats, or private chats to which you can add bots as admins, use [my other script](https://github.com/code29563/copy-history-bot-1).
+
+The types of source chats the userbot is catered to so far are chats and groups (including regular groups, supergroups/megagroups and gigagroups/broadcast groups). The types of destination chats tested so far are mainly chats. The script would likely work for other types of source and destination chats, but these are the ones which have been tested and catered for.
 
 - [Features](#Features)
 - [Getting started](#Getting-started)
@@ -14,7 +16,7 @@ This script is intended for copying messages from private channels to which you 
 
 # Features
 
-- Messages are copied to the destination channel without the 'Forwarded from:' tag
+- Messages are copied to the destination chat without the 'Forwarded from:' tag
 - Copy multiple streams without having to manually re-run the script and adjust the environment variables each time
 - Dynamically switching between clients when encountering floodwaits, to avoid having to wait them out and increase the average rate at which messages are sent
 - Uses bot clients to send messages wherever possible, to reduce the number of messages sent by user clients which are vulnerable to bans
@@ -22,6 +24,7 @@ This script is intended for copying messages from private channels to which you 
 - The script doesn't terminate when it gets disconnected from the internet – it just attempts to reconnect until the connection is restored and then resumes working. Likewise when the system goes to sleep, it resumres when it wakes up and reconnects to the internet.
 - Handling of MediaEmptyError and FileReferenceExpiredError
 - Option to print each successfully copied message to a file
+- Messages with buttons get copied fully with their buttons, and to do so, any login URLs are replaced with regular URLs.
 
 # Getting started
 The environment variables are to be given in a .env file. An example is shown in example.env.
@@ -47,11 +50,11 @@ The environment variables are to be given in a .env file. An example is shown in
 
 	The minimum number of bot tokens required is 1.
 
-4. Fill in the STREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source channel from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination channel to which to copy those messages. You can list multiple streams in the STREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
+4. Fill in the STREAMS environment variable, which gives the details of the messages to be copied and where to copy them to. A single stream contains 4 comma-separated elements which are (in order): the ID of the source chat from which messages are to be copied, the ID of the message from which to start copying (which becomes the first message to be copied), the ID of the message at which to finish copying (which becomes the last message to be copied), and the ID of the destination chat to which to copy those messages. You can list multiple streams in the STREAMS environment variable, separated from each other by semi-colons, and if you want you can split them onto multiple lines and leave spaces between the elements and the commas/semi-colons. The streams are copied successively, one after the other, in the order you list them in the environment variable.
 
-	The channel IDs and message IDs can simply be obtained by right-clicking a message in the Telegram app and copying it's link, then paste it somewhere. The number after the final forward slash is the message ID, and the number before it is the channel ID, but append -100 to it before inserting it in STREAMS. You can also find the channel ID through other means like with @username\_to\_id\_bot, or exporting your Telegram data from the app as 'Machine-readable JSON' where you can find the IDs of channels you're subcribed to in results.json.
+	The chat IDs and message IDs can simply be obtained by right-clicking a message in the Telegram app and copying it's link, then paste it somewhere. The number after the final forward slash is the message ID, and the number before it is the chat ID, but append -100 to it before inserting it in STREAMS. You can also find the chat ID through other means like with @username\_to\_id\_bot, or exporting your Telegram data from the app as 'Machine-readable JSON' where you can find the IDs of chats you're subcribed to in results.json.
 
-5. Make sure all the user clients are subscribed to the channel from which messages are to be copied, and make sure both the user clients and bot clients are admins in the destination channel to which messages are to be copied.
+5. Make sure all the user clients have joined the chat/group from which messages are to be copied, and make sure both the user clients and bot clients are admins in the destination chat to which messages are to be copied.
 6. If you want to print the Message object of each successfully copied message to a file, set the PRINT_TO_FILE environment variable to "1". The printed object contains various details of the message not present in the (already detailed) caption.
 7. Run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
 
@@ -59,13 +62,13 @@ The environment variables are to be given in a .env file. An example is shown in
 
 Messages in Telegram can be either media messages (if they contain a media object) or text messages (if they don't). See a list of media objects [here](https://core.telegram.org/type/MessageMedia).
 
-If a text message is retrieved from a channel by a client, then it can be copied/forwarded by another client even if they didn't have access to the original channel. Any client can access the message's text (fully formatted with its [entities](https://core.telegram.org/api/entities)).
+If a text message is retrieved from a chat by a client, then it can be copied/forwarded by another client even if they didn't have access to the original chat. Any client can access the message's text (fully formatted with its [entities](https://core.telegram.org/api/entities)).
 
-Some media objects in Telegram require an access hash (which could be unique for each client) for a client to be able to copy/forward them, regardless of whether it's a bot client or a user client. The client can obtain an access hash when it has access to the message containing the media object. When the channel is public, then like a user client, a bot can access the channel's messages without being a subscriber, otherwise if the channel is private then it seems it needs to be a subscriber. Currently it seems bots can only be subscribed to channels as admins, so when you aren't able to add bots as admins to the private channel, the use of a bot client to copy those media messages from it is out of question. When an attempt is made to copy them with a bot client, it fails with a MediaEmptyError.
+Some media objects in Telegram require an access hash (which could be unique for each client) for a client to be able to copy/forward them, regardless of whether it's a bot client or a user client. The client can obtain an access hash when it has access to the message containing the media object. When a chat is public, then like a user client, a bot can access the chat's messages without being a subscriber, otherwise if a chat is private then it seems it needs to be a subscriber. For groups, bots can't access their messages without being members, regardless of whether they're public or private, as far as I'm aware. Currently it seems bots can only be subscribed to chats as admins, so when you aren't able to add bots as admins to the private chat, the use of a bot client to copy those media messages from it is out of question. When an attempt is made to copy them with a bot client, it fails with a MediaEmptyError.
 
 Some media objects don't seem to require a client-specific access hash, including stickers, polls, contacts, and [locations](https://core.telegram.org/constructor/messageMediaGeo). These messages can be sent by a bot client like text messages.
 
-For those media objects that do require an access hash, the remaining option is therefore to copy them with user clients that are subscribed to the channel and hence have access to its messages.
+For those media objects that do require an access hash, the remaining option is therefore to copy them with user clients that have joined the chat/group and hence have access to its messages.
 
 This faces an issue that [my other script](https://github.com/code29563/copy-history-bot-1) didn't face: user clients are at risk of getting banned if they send a lot of requests. Multiple people have mentioned this and I myself have experienced this with 7 accounts getting banned, all of which were accounts made relatively recently though, whereas I didn't experience the same with some of my older accounts even when sending the same number of messages, so it's possible that for a recently created account to start sending lots of messages as one of the first things it does is considered suspicious activity by Telegram's system and receives an automatic ban.
 
@@ -76,9 +79,9 @@ This may be one reason it's worth including as many user clients' session string
 # How it works
 The script is profusely commented to explain some of the technical implementation, but the comments are naturally structured according to the code. What follows is an attempt to explain in more natural language the ideas behind the code.
 
-For each stream, the user clients all concurrently retrieve the messages to be copied. Each user client retrieves all the messages to be copied so it has its own version of the Message object with its own access hash. When just some portion of the messages to be copied has been retrieved by all user clients, those messages start to get copied to the destination channel, whilst the rest of the messages are still being retrieved. No attempt is made to copy a message until all user clients have retrieved it. The process of retrieving messages is generally much faster than the process of sending them, so it's quite unlikely the script would finish copying the retrieved messages and have to wait idly for more messages to be retrieved.
+For each stream, the user clients all concurrently retrieve the messages to be copied. Each user client retrieves all the messages to be copied so it has its own version of the Message object with its own access hash. When just some portion of the messages to be copied has been retrieved by all user clients, those messages start to get copied to the destination chat, whilst the rest of the messages are still being retrieved. No attempt is made to copy a message until all user clients have retrieved it. The process of retrieving messages is generally much faster than the process of sending them, so it's quite unlikely the script would finish copying the retrieved messages and have to wait idly for more messages to be retrieved.
 
-Each user client is assigned a list in which it stores the messages it retrieves. All these lists should turn out identical in the messages they contain (even if the Message objects differ due to differing access hashes), because all user clients are retrieving the same messages. So the message at any particular position k in the list of one user client should have the same ID as the message at that same position k in the list of any of the other user clients. If that doesn't turn out to be the case, it seems some of the messages to be retrieved were deleted from the source channel during the process, such that some user clients ended up retrieving them and others didn't.
+Each user client is assigned a list in which it stores the messages it retrieves. All these lists should turn out identical in the messages they contain (even if the Message objects differ due to differing access hashes), because all user clients are retrieving the same messages. So the message at any particular position k in the list of one user client should have the same ID as the message at that same position k in the list of any of the other user clients. If that doesn't turn out to be the case, it seems some of the messages to be retrieved were deleted from the source chat during the process, such that some user clients ended up retrieving them and others didn't.
 
 E.g. if there are two user clients, and messages with IDs 1 to 10000 to be copied, then if message 5000 gets deleted after user client 1 had already retrieved it but before user client 2 had done so, then the 4999th element of user client 1's list is the message with ID 4999, and the 4999th element of user client 2's list is also the message with ID 4999, but the 5000th element of user client 1's list is the mesage with ID 5000, while the 5000th element of user client 2's list would be the message with ID 5001. The 5001th element would be message 5001 and message 5002 respectively, and so on until the end of the list, with the positions of messages in one list being offset by 1 relative to their positions in the other list.
 
@@ -132,18 +135,19 @@ Note that if you don't have enough bot clients but all the messages to be copied
 
 Not all messages accept a text component, but those that do include text messages (obviously), videos, photos, documents. The script adds a caption to whichever message can have a text component. The caption consists of the following components:
 
-- For every message, the first line of the caption is 'chat\_ID: ' followed by the ID of the source channel from which the message has been copied
-- The second line is 'message\_ID: ' followed by the ID of the message in the source channel. If the message in the source chanel has been edited since it was first sent there, this is followed by ' (a\_previous\_message\_edited)'.
-- The third line is 'date: ' followed by the date and time at which the message was sent in the source channel, except if the message has been edited since it was first sent, in which case it's the date and time at which the message was last edited instead of that at which it was first sent. The format of the date in both cases is 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
+- For every message, the first line of the caption is 'chat\_ID: ' followed by the ID of the source chat from which the message has been copied
+- The second line is 'message\_ID: ' followed by the ID of the message in the source chat. If the message in the source chanel has been edited since it was first sent there, this is followed by ' (a\_previous\_message\_edited)'.
+- The third line is 'date: ' followed by the date and time at which the message was sent in the source chat, except if the message has been edited since it was first sent, in which case it's the date and time at which the message was last edited instead of that at which it was first sent. The format of the date in both cases is 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
+- If the source chat is a group, the next line is 'sender_ID: ' followed by the ID of the sender of the message in the group, which can either be a user/bot, a chat (if it's linked to the group or the message was sent by a user as a chat), or an anonymous group admin (in which case the ID is the group's ID).
 - If the message is a reply to a previous message, the next line is 'in\_reply\_to\_message\_ID: ' followed by the ID of the message to which it was a reply.
-- If the message in the source channel had been forwarded from somewhere else, such that it had a 'Forwarded from: ' tag, then:
+- If the message in the source chat had been forwarded from somewhere else, such that it had a 'Forwarded from: ' tag, then:
   - If the message was forwarded from an anonymous group admin, the next line is 'forwarded\_from\_chat\_ID: {ID} (supergroup)' where {ID} is the ID of the group from which it was forwarded
-  - If the message was forwarded from a channel, the next line is 'forwarded\_from\_chat\_ID: ' followed by the ID of that channel, and the line after that is 'forwarded\_from\_message\_ID: ' followed by the ID of the original message in that channel
+  - If the message was forwarded from a chat, the next line is 'forwarded\_from\_chat\_ID: ' followed by the ID of that chat, and the line after that is 'forwarded\_from\_message\_ID: ' followed by the ID of the original message in that chat
   - If the message is forwarded from an individual user/bot, even if that original message was sent in a group rather than a private chat, then:
     - If it's a bot, or a user that allowed linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_ID: ' followed by the ID of the user/bot
     - Otherwise, if it's a user that didn't allow linking to their account in messages forwarded from them, the next line is 'forwarded\_from\_user\_name: ' followed by the name of the user, as it appears in the 'Forwarded from: ' tag
 	
-  The next line is then 'forwarded\_from\_message\_date: ' followed by the date and time at which the original message was sent in the chat from which it was forwarded to the source channel. The format of the date is likewise 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
+  The next line is then 'forwarded\_from\_message\_date: ' followed by the date and time at which the original message was sent in the chat from which it was forwarded to the source chat. The format of the date is likewise 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
 
 The issue of the attributes of the Message object of a forwarded message is still somewhat vague, so if none of the attributes exist which are used to determine which of the above cases applies, the message is copied without this part of the caption, and a message is printed to the terminal which should provide relevant details to look into it if you wish.
 
@@ -153,7 +157,7 @@ This applies if the text a message already contains wouldn't exceed the limit if
 
 # Handling FileReferenceExpiredError and MediaEmptyError with a user client
 
-User clients can also receive a MediaEmptyError, if they aren't subscribed to the channel from which messages are being copied, so make sure they are before you start the script.
+User clients can also receive a MediaEmptyError, if they haven't joined the channel/group from which messages are being copied, so make sure they have before you start the script.
 
 But I have also experienced user clients receiving a MediaEmptyError whilst the script is running and after they had already copied many messages without issue. The client then continues to receive it even as it retries sending the message again and again. It's still not clear what causes this, but the only solution I've found so far is to restart the script, after which that client is able to send that message without receiving the error.
 
@@ -161,14 +165,19 @@ When implementing a 2-second wait for the user client, I would receive a FileRef
 
 To handle both these errors, the script updates the STREAMS environment variable and the RUN environment variable, and then restarts. This is the point of the RUN environment variable, to keep track of how many times the script has restarted. It starts at 1 when first running the script, and increases by 1 every time the script restarts itself. Its value is printed in every log statement so you can tell from the log statements in the terminal how many times the script has restarted. The STREAMS environment variable is updated to start copying in the next run from wherever the script left off in this run.
 
+# Messages with buttons
+User clients can't send messages with inline keyboard buttons as far as I'm aware, so the userbot copies the message without its buttons, and then a bot client is used to edit the copied message and add the buttons to it.
+
+If the buttons in the original message contain a login URL (or authorisation URL), then it's converted to a regular URL first and then included in the copied message. This is because login URLs have to be specifically configured for a bot as far as I'm aware, so if the bot tries to copy a message with a login URL that isn't configured for it, it throws an error.
+
 # Other notes
 
 If you cancel the script whilst it's running (e.g. using Ctrl+C), a message is output to the terminal giving the ID of the last copied message of the stream that was being copied at the time. Depending on when exactly you cancel the script, is a possibility that another message has successfully been copied, such that the ID output to the terminal is actually the ID of the penultimate message to have been copied, so you may want to confirm this yourself before using the ID output to the terminal to e.g. update the STREAMS environment variable for the next time you manually run the script to pick up where it left off.
 
 # Possible Improvements
-- Add full support for copying messages to/from groups, supergroups, and private chats
+- Add full support for copying messages to/from other types of chats like private chats with other users and bots
 - Hence add support for using usernames, phone numbers, exact names, invite links, etc, rather than just chat IDs in the .env file (maybe using an [input entity](https://docs.telethon.dev/en/latest/modules/client.html#telethon.client.users.UserMethods.get_input_entity))
-- Skip over messages deleted from the source channel instead of terminating the script
+- Skip over messages deleted from the source chat instead of terminating the script
 - Add the option to use only user clients (like when it's known all the messages to be copied are media messages with hashes), and the option to use only bot clients (for public channels or private channels in which they're admins), the latter potentially doing away with the need for [a separate script](https://github.com/code29563/copy-history-bot-1)
 - Add the option to switch to user clients when all the bot clients have a floodwait
 - Set the RUN environment variable within the script rather than the .env file
