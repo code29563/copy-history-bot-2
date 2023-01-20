@@ -11,6 +11,8 @@ import time
 import sys
 import signal
 import asyncio
+#from textwrap import wrap
+from character_limits import split_message
 
 load_dotenv() #loading environment variables from .env file
 
@@ -37,6 +39,7 @@ apihash = os.environ.get("API_HASH")
 l = list(range(len(ss))) #just to give it the right size
 for b in l:
     l[b] = TelegramClient(StringSession(ss[b]),apiid,apihash,connection_retries=None,flood_sleep_threshold=0) #flood_sleep_threshold=0 so it doesn't automatically sleep for any floodwait errors
+    l[b].parse_mode = None
 
 str1 = os.environ.get("BOT_TOKENS")
 str2 = str1.replace("\n","")
@@ -45,6 +48,7 @@ bts = str2.split(",")
 b = list(range(len(bts)))
 for f in b:
     b[f] = TelegramClient(None,apiid,apihash,connection_retries=None,flood_sleep_threshold=0)
+    b[f].parse_mode = None
 
 h = [[] for y in l] #initialise the lists of messages retrieved by each user client
 async def main(i,s,j,user):
@@ -72,7 +76,7 @@ async def main(i,s,j,user):
 def err_msgs(k,lid):
     """called when the messages at position k in the lists of messages don't all have the same ID (or aren't all 'finished')"""
     logging.info('It seems some of the messages to be copied of stream {0} might have been deleted whilst the user clients were retrieving them. Update the STREAMS environment variable and re-run the script if you still want to continue.'.format(i+1))
-    logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid))
+    logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid[0]))
     for j,v in enumerate(h):
         if v[k] == 'finished':
             p = k-1
@@ -82,22 +86,126 @@ def err_msgs(k,lid):
         logging.info('The ID of the this message (after which this error has appeared) of stream {0} retrieved by user client {1} was {2}'.format(i+1,j+1,v[p].id))
     sys.exit(0)
 
-async def copy_message(message,client,to,ct): #defining a function which is used repeatedly later in the code
+async def move(x,w,ct,t=None,f3=False):
+    """To move to the next client, which is the client with the lowest remaining floodwait, or if 'f3=True' then the client with no remaining floodwait that maxxed out its counter longest ago
+    """
+    pl = [q[0] - (time.time() - q[1]) for q in w] #the remaining floodwaits of each client, negative values indicate there is no remaining floodwait for that client
+    #the floodwaits of the clients in pl are in the same order as the order of the clients themselves in cl, so the index of a client in cl is equal to the index of its floodwait in cl (i.e. pl[idx]=cl[idx] for an index 'idx')
+    #print(pl)
+    kt = False #initialising it as False, possibly to be changed below
+    pli = sorted(range(len(pl)), key=lambda i1: pl[i1]) #a list of the indices of the sorted elements of pl, from the index of the lowest element of pl to the index of the highest element of pl
+    if f3: #if it must switch to a different client
+        pli1 = [q for q,q2 in enumerate(pl) if q2 <= 0] #the indices of the clients with no remaining floodwait
+        t1 = [t[q] for q in pli1] #for those clients with no remaining floodwait, the times when their counters last reached the maximum
+        x[0] = pli1[t1.index(min(t1))] #the index of the client (with no remaining floodwait) whose counter last reached the maximum longest ago
+    elif pli[0] == x[0]: #otherwise, if it need not switch to a different client, it can stay on the same client if it has the least remaining floodwait
+        kt = True #to keep track of this being the case (that it's remaining on the same client)
+    else:
+        x[0] = pli[0] #switch to the client with the lowest remaining floodwait
+    p = pl[x[0]] #the remaining floodwait
+    if p > 0: #i.e. if the time passed since receiving the floodwait error is less than the time it was required to wait
+        if kt: #if it's the same client as before, so no change in client has occurred
+            logging.info('It has the least remaining floodwait of all the {0} clients; waiting {1} seconds to finish its floodwait then continuing with it'.format(ct[0],p))
+        else: #if it's a different client to before
+            logging.info('Waiting {0} seconds before switiching to {1} client {2}, to finish its floodwait'.format(p,ct[0],x[0]+1))
+        await asyncio.sleep(p) #sleep the remaining amount of time before moving onto the next bot
+    elif not f3: #if its floodwait has finished and it need not wait any longer
+        logging.info('Switching to {0} client {1}'.format(ct[0],x[0]+1))
+
+async def movec(c,m,t,x,w,ct):
+    """to either increase the counter by 1 or move to the next client and reset the counter"""
+    if c[0] == m: #if the counter has reached the maximum
+        t[x[0]] = time.time() #the time when the counter has reached its maximum
+        await move(x,w,ct,t,f3=True)
+        c[0] = 1 #reset the counter for the next client
+    else: #if it hasn't reached the maximum yet
+        c[0] += 1
+
+xu = [0] #x is the index of the current client to be used to copy messages in the list of clients (be it the list of user clients or the list of bot clients), set to 0 to start the process with the first client in the list
+xb = [0]
+#w is a list, each of its elements a 2-element list for each client, its 1st element being the required wait time for that client resulting from the most recent floodwait error it encountered, and its 2nd element being the time the client encountered that floodwait error
+wu = [[0,0] for i in l] #initialising w as such to suitably handle the first round of floodwaits, when the next client in line hasn't had any floodwaits
+wb = [[0,0] for i in b]
+cu = [1] #c is used as a counter to keep track of how many messages the current client has set
+cb = [1]
+#t is a list containing, for each client, the most recent time when the counter of the number of messages the client has sent reached the maximum
+tu = [0 for i in l]
+tb = [0 for i in b]
+#x and c above are intialised as single-element lists so that updates to x and c (see below) are reflected in them too
+ct = ['bot']
+
+sl = float(os.environ.get('SLEEP')) #the minimum amount of time the user client should wait between sending messages
+
+cid = [0] #initialising the ID of the current message being copied
+lid = [0] #initialising the ID of the last message to be successfuly copied
+
+async def process_message(process,*args,**kwargs):
+    #first try sending the message with the current bot client:
+    ct[0] = 'bot'
+    x = xb
+    cl = b
+    w = wb
+    c = cb
+    t = tb
+    m = 5 #the maximum number of messages a bot client should send before moving onto a different bot client
+    while True: #infinite looping; this is to try again for this message after handling any exceptions
+        try:
+            if process == 'send':
+                #if 'reply_to' in kwargs:
+                #    extra = 'caption of '
+                #else:
+                #    extra = ''
+                #logging.info('attempting to copy {0}message {1} with {2} client {3}'.format(extra,cid[0],ct[0],x[0]+1))
+                a = await cl[x[0]].send_message(*args,**kwargs)
+                #logging.info('copied {0}message {1} with {2} client {3}'.format(extra,cid[0],ct[0],x[0]+1))
+            elif process == 'edit':
+                a = await cl[x[0]].edit_message(*args,**kwargs)
+        except errors.FloodWaitError as e:
+            te = time.time() #the current time at which the floodwait has occurred
+            wait = e.seconds #the required wait time
+            w[x[0]] = [wait,te]
+            logging.info('FloodWait error of {0} seconds encountered on {1} client {2}'.format(w[x[0]][0],ct[0],x[0]+1))
+            #logging.info('FloodWait error of {0} seconds encountered on {1} client {2} when trying to copy {3}message {4}'.format(w[x[0]][0],ct[0],x[0]+1,extra,cid[0]))
+            await move(x,w,ct) #move to the next client
+            c[0] = 1 #reset the counter to 1 for the next client
+            continue #continue to the next iteration of the while loop
+        except errors.rpcerrorlist.MediaEmptyError:
+            if ct[0] == 'user': #if the client that's encountered the MediaEmptyError is a user
+                logging.info('A MediaEmptyError was encountered with user client {0} when trying to send message {1}. Check that it has access to the source chat and/or check the media object.'.format(x[0]+1,cid[0]))
+                logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid[0]))
+                restart(i,cid) #restart the script
+            #logging.info('moving to user client to copy {0}message {1}'.format(extra,cid[0]))
+            await movec(c,m,t,x,w,ct) #increment the counter for bot clients or move to the next bot client if it's reached the maximum
+            #switch to user client
+            ct[0] = 'user'
+            x = xu
+            cl = l
+            w = wu
+            c = cu
+            t = tu
+            m = 50
+            await asyncio.sleep(sl)
+            continue #to the next iteration of the while loop to try sending the message with a user client this time
+        break
+    await movec(c,m,t,x,w,ct) #increment the counter or move to the next client if it's reached the maximum
+    return a
+
+async def copy_message(message,to): #defining a function which is used repeatedly later in the code
     """copy the given message to the destination with the appropriate added text/caption"""
         
     if type(message.reply_markup) == ReplyInlineMarkup: #checking if the message has reply_markup and if so, then is it inline keyboard buttons
         #print(print(message.reply_markup.__dict__))
-        for row in message.reply_markup.rows: #iterating through each row of buttons
+        for i in range(len(message.reply_markup.rows)): #iterating through each row of buttons
             #print(row.__dict__)
-            for i in range(len(row.buttons)): #iterating through the button in each row
-                if type(row.buttons[i]) == KeyboardButtonUrlAuth: #change any login urls to regular urls
-                    #print(row.buttons[i].__dict__)
-                    row.buttons[i] = Button.url(text = row.buttons[i].text, url = row.buttons[i].url)
-                    #print(row.buttons[i].__dict__)
-    
-    if message.buttons and ct == 'user':
-        buts = message.buttons
-    
+            for j in range(len(message.reply_markup.rows[i].buttons)): #iterating through the button in each row
+                if type(message.reply_markup.rows[i].buttons[j]) == KeyboardButtonUrlAuth: #change any login urls to regular urls
+                    #print(message.reply_markup.rows[i].buttons[j].__dict__)
+                    #print(message.buttons[i][j].button.__dict__)
+                    message.reply_markup.rows[i].buttons[j] = Button.url(text = message.reply_markup.rows[i].buttons[j].text, url = message.reply_markup.rows[i].buttons[j].url)
+                    message.buttons[i][j].button = message.reply_markup.rows[i].buttons[j]
+                    #print(message.reply_markup.rows[i].buttons[j].__dict__)
+                    #print(message.buttons[i][j].button.__dict__)
+        
     string = '\n\nchat_ID: ' + str(message.chat_id) + '\nmessage_ID: ' + str(message.id) #initialising the string to be added to the text/caption of the copied message
     if message.edit_date: #if the message is a previous message edited, then edit_date is the date of the most recent edit, which is what I want to output
         date = message.edit_date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC') #converts the date from UNIX time to a more readable format
@@ -105,6 +213,11 @@ async def copy_message(message,client,to,ct): #defining a function which is used
     else: #i.e. if the message is brand new
         date = message.date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
         string += '\ndate: ' + date
+    if message.is_group: #if the message was sent in a group (including megagroups and gigagroups)
+        if message.sender: #in which case the sender seems to be either a user/bot or a channel that's linked to the group
+            string += '\nsender_ID: ' + str(message.sender_id)
+        else: #in which case the sender seems to be an anonymous group admin
+            string += '\nsender_ID: ' + str(message.chat_id) #i.e. just the ID of the group in which it's been sent
     if message.reply_to:
         string += '\nin_reply_to_message_ID: ' + str(message.reply_to.reply_to_msg_id)
     if message.fwd_from: #if this property exists, it indicates the message is forwarded
@@ -122,83 +235,104 @@ async def copy_message(message,client,to,ct): #defining a function which is used
             print(message)
             logging.info('and here is message.forward:')
             print(vars(message.forward))    
+    
+    
+    '''
+    n = False #maximum no. characters of the text part of the message (either 4096 or 1024), only relevant for those over the limit
     if message.media:
         if type(message.media) == MessageMediaWebPage: #a media type, but not subject to the 1024 character restriction
             if len(message.message + string) <= 4096: #to ensure it doesn't go above the limit for text messages, which I think is 4096 characters
                 message.message += string #adding the above string to the text of the message
-                a = await client.send_message(to,message) #copy the message (not forward) to the destination chat
-                if message.buttons and ct == 'user':
-                    await b[xb[0]].edit_message(a,buttons=buts)
+                a = await process_message('send',to,message) #copy the message (not forward) to the destination chat
             else: #if the combined string would be over the limit for text messages, send the message without the added string and send the string as a reply to it
-                a = await client.send_message(to,message)
-                await client.send_message(to,string[2:],reply_to=a) #remove the line breaks at the beginning of the above string, as it's not being added to previously existing text so nothing to separate it from
-                if message.buttons and ct == 'user':
-                    await b[xb[0]].edit_message(a,buttons=buts)
+                a = await process_message('send',to,message)
+                n = 4096
+                #await process_message('send',to,string[2:],reply_to=a) #remove the line breaks at the beginning of the above string, as it's not being added to previously existing text so nothing to separate it from
         elif message.message: #media that already has a caption
             if len(message.message + string) <= 1024: #to ensure it doesn't go above the limit for captions on media messages, which I think is 1024 characters
                 message.message += string #adding the above string to the caption of the message
-                a = await client.send_message(to,message)
-                if message.buttons and ct == 'user':
-                    await b[xb[0]].edit_message(a,buttons=buts)
+                a = await process_message('send',to,message)
             else:
-                a = await client.send_message(to,message)
-                await client.send_message(to,string[2:],reply_to=a)
-                if message.buttons and ct == 'user':
-                    await b[xb[0]].edit_message(a,buttons=buts)
+                a = await process_message('send',to,message)
+                n = 1024
+                #await process_message('send',to,string[2:],reply_to=a)
         else: #if it doesn't already have a caption, make the above string its caption
             message.message = string[2:]
-            a = await client.send_message(to,message)
-            if message.buttons and ct == 'user':
-                await b[xb[0]].edit_message(a,buttons=buts)
+            a = await process_message('send',to,message)
     else:
         if len(message.message + string) <= 4096:
             message.message += string
-            await client.send_message(to,message) 
-            if message.buttons and ct == 'user':
-                await b[xb[0]].edit_message(a,buttons=buts)
+            a = await process_message('send',to,message) 
         else:
-            a = await client.send_message(to,message)
-            await client.send_message(to,string[2:],reply_to=a)
-            if message.buttons and ct == 'user':
-                await b[xb[0]].edit_message(a,buttons=buts)
+            a = await process_message('send',to,message)
+            n = 4096
+            #await process_message('send',to,string[2:],reply_to=a)
+    '''    
+    
+    #first, determine the max no. characters of the text part of the message, depending on message type. Premium users may have higher character limits than free-tier users, so the limits below assume a free-tier and allow copying a message with Premium character length
+    media_limit = 1024
+    text_limit = 4096
+    if message.media:
+        if type(message.media) == MessageMediaWebPage: #a media type, but with a text limit equal to that of regular text messages
+            n = text_limit
+        else: #for all other media types, their caption limit:
+            n = media_limit
+    else: #just a regular text message
+        n = text_limit
+    #print(message)
+    if message.message: #a text message, or media message that already has a caption
+        if len(message.message) > n: #if the length of the text part of the messages exceeds the limit for free users ...
+            logging.info('splitting message {0} of chat {1}'.format(message.id,message.chat_id))
+            #t1 = time.time()
+            lmsgs = split_message(message.message,message.entities,n) #split the text part of the message into parts less than n characters in length, avoiding splitting apart words or formatting entities where possible; the result is a list of strings with the formatting entities applicable to them
+            #t2 = time.time()
+            #print('time elapsed:',t2-t1)
+        else: #just for consistency in the code, setting this
+            lmsgs = [[message.message,message.entities]]
+        if len(lmsgs[-1][0] + string) <= n: #add the above string to the last element of lstrings if within the limit
+            lmsgs[-1][0] += string
+        else: #send the above string separately
+            lmsgs.append([string[2:],None])
+    else: #a media message with no caption
+        lmsgs = [[string[2:],message.entities]]
+    message.message,message.entities = lmsgs[0][0],lmsgs[0][1] #make the first element of lmsgs part of the message object, the rest to be sent separately; this may be the only (and hence also last) element of lmsgs if everything was within the limit
+    a = await process_message('send',to,message) #copy the message (not forward) to the destination chat
+    if message.buttons and ct[0] == 'user': #if the message was copied by a user, then it was copied without its buttons ...
+        await process_message('edit',a,buttons=message.buttons) #... so add them on using a bot client
+    for text in lmsgs[1:]: #copy the rest of the strings as text messages in reply to the previous one, formatted with their entities; loop has zero iterations if lmsgs had only one element
+        a = await process_message('send',to,text[0],reply_to=a,formatting_entities=text[1])
 
-async def move(x,w,ct,t=None,id=None,f=False,f3=False):
-    """To move to the next client, which is the client with the lowest remaining floodwait, or if 'f3=True' then the client with no remaining floodwait that maxxed out its counter longest ago
-    set 'f=True' if a floodwait has actually been encountered, to print the message below
+    #The below works just fine when ignoring formatting entities, not otherwise:
     """
-    if f:
-        logging.info('FloodWait error of {0} seconds encountered on {1} client {2} when trying to copy message {3}'.format(w[x[0]][0],ct,x[0]+1,id))
-    pl = [q[0] - (time.time() - q[1]) for q in w] #the remaining floodwaits of each client, negative values indicate there is no remaining floodwait for that client
-    #the floodwaits of the clients in pl are in the same order as the order of the clients themselves in cl, so the index of a client in cl is equal to the index of its floodwait in cl (i.e. pl[idx]=cl[idx] for an index 'idx')
-    #print(pl)
-    kt = False #initialising it as False, possibly to be changed below
-    pli = sorted(range(len(pl)), key=lambda i1: pl[i1]) #a list of the indices of the sorted elements of pl, from the index of the lowest element of pl to the index of the highest element of pl
-    if f3: #if it must switch to a different client
-        pli1 = [q for q,q2 in enumerate(pl) if q2 <= 0] #the indices of the clients with no remaining floodwait
-        t1 = [t[q] for q in pli1] #for those clients with no remaining floodwait, the times when their counters last reached the maximum
-        x[0] = pli1[t1.index(min(t1))] #the index of the client (with no remaining floodwait) whose counter last reached the maximum longest ago
-    elif pli[0] == x[0]: #otherwise, if it need not switch to a different client, it can stay on the same client if it has the least remaining floodwait
-        kt = True #to keep track of this being the case (that it's remaining on the same client)
-    else:
-        x[0] = pli[0] #switch to the client with the lowest remaining floodwait
-    p = pl[x[0]] #the remaining floodwait
-    if p > 0: #i.e. if the time passed since receiving the floodwait error is less than the time it was required to wait
-        if kt: #if it's the same client as before, so no change in client has occurred
-            logging.info('It has the least remaining floodwait of all the {0} clients; waiting {1} seconds to finish its floodwait then continuing with it'.format(ct,p))
-        else: #if it's a different client to before
-            logging.info('Waiting {0} seconds before switiching to {1} client {2}, to finish its floodwait'.format(p,ct,x[0]+1))
-        await asyncio.sleep(p) #sleep the remaining amount of time before moving onto the next bot
-    elif not f3: #if its floodwait has finished and it need not wait any longer
-        logging.info('Switching to {0} client {1}'.format(ct,x[0]+1))
+    if message.message: #a text message, or media message that already has a caption
+        lstrings = wrap(message.message,n,break_on_hyphens=False,expand_tabs=False,replace_whitespace=False) #split the text part of the message into parts below n characters, without splitting single words apart
+        if len(lstrings[-1] + string) <= n: #add the above string to the last element of lstrings if within the limit
+            lstrings[-1] += string
+        else: #send the above string separately
+            lstrings.append(string[2:])
+    else: #a media message with no caption
+        lstrings = [string[2:]] #make the above string its caption; removing the initial line breaks but may not be necessary as Telegram strips the text server-side anyway
+    #print(len(lstrings))
+    #print(lstrings)
+    message.message = lstrings[0] #make the first element of lstrings the text of the message, the rest to be sent separately; this may be the only (and hence also last) element of lstrings if everything was within the limit
+    a = await process_message('send',to,message) #copy the message (not forward) to the destination chat
+    if message.buttons and ct[0] == 'user': #if the message was copied by a user, then it was copied without its buttons ...
+        await process_message('edit',a,buttons=message.buttons) #... so add them on using a bot client
+    for sstring in lstrings[1:]: #copy the rest of the strings as text messages in reply to the previous one; loop has zero iterations if lstrings had only one element
+        a = await process_message('send',to,sstring,reply_to=a,formatting_entities=None)
+    """
+    
+    '''
+    if n:
+        lstrings = wrap(message.message,n,break_on_hyphens=False)
+        if len(lstrings[-1] + string) <= n:
+            lstrings[-1] += string
+        else:
+            lstrings.append(string[2:])
+        for sstring in lstrings:
+            a = await process_message('send',to,sstring,reply_to=a)
+    '''
 
-async def movec(c,m,t,x,w,ct):
-    """to either increase the counter by 1 or move to the next client and reset the counter"""
-    if c[0] == m: #if the counter has reached the maximum
-        t[x[0]] = time.time() #the time when the counter has reached its maximum
-        await move(x,w,ct,t,f3=True)
-        c[0] = 1 #reset the counter for the next client
-    else: #if it hasn't reached the maximum yet
-        c[0] += 1
 
 def restart(i,ID):
     """to restart the script"""
@@ -210,29 +344,15 @@ def restart(i,ID):
     os.environ["RUN"] = str(int(run) + 1) #increment the run of the script by 1
     os.execv(sys.executable, ['python3'] + sys.argv) #restart the script
 
-xu = [0] #x is the index of the current client to be used to copy messages in the list of clients (be it the list of user clients or the list of bot clients), set to 0 to start the process with the first client in the list
-xb = [0]
-#w is a list, each of its elements a 2-element list for each client, its 1st element being the required wait time for that client resulting from the most recent floodwait error it encountered, and its 2nd element being the time the client encountered that floodwait error
-wu = [[0,0] for i in l] #initialising w as such to suitably handle the first round of floodwaits, when the next client in line hasn't had any floodwaits
-wb = [[0,0] for i in b]
-cu = [1] #c is used as a counter to keep track of how many messages the current client has set
-cb = [1]
-#t is a list containing, for each client, the most recent time when the counter of the number of messages the client has sent reached the maximum
-tu = [0 for i in l]
-tb = [0 for i in b]
-#x and c above are intialised as single-element lists so that updates to x and c (see below) are reflected in them too
-
-sl = float(os.environ.get('SLEEP'))
-
 async def main1(i,s):
     #await b[0].send_message(-1001506400182,'--------')
     #sys.exit(0)
     for j,user in enumerate(l):
         asyncio.create_task(main(i,s,j,user)) #all user client concurrently start retrieving the messages to be copied
-    lid = 0 #the ID of the last copied message; initialised as 0 to indicate no message has been copied yet
+    lid[0] = 0 #the ID of the last copied message; initialised as 0 to indicate no message has been copied yet
     #to handle cases where the script is cancelled before finishing with all messages:
     def cancel(sig,frame):
-        logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid))
+        logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid[0]))
         sys.exit(0)
     signal.signal(signal.SIGINT, cancel)
     k = 0 #the index of the next item to be considered in the lists of messages
@@ -255,59 +375,20 @@ async def main1(i,s):
             #if all the items with index k are Message objects with the same ID, then proceed to copy that message
             to = s[3] #the destination chat
             msg = h[xu[0]][k] #the message is retrieved from list of the current user client to copy messages
+            cid[0] = msg.id #thd ID of the current message to be copied
             if not type(msg) == MessageService: #as it seems services messages (like a message being pinned, a channel name or photo being changed, etc) can't be copied
-                bmsg = msg.message #make a backup copy of the retrieved message's text
-                #first try sending the message with the current bot client:
-                ct = 'bot'
-                x = xb
-                cl = b
-                w = wb
-                c = cb
-                t = tb
-                m = 5 #the maximum number of messages a bot client should send before moving onto a different bot client
-                while True: #infinite looping; this is to try again for this message after handling any exceptions
-                    try:
-                        #logging.info('attempting to copy message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
-                        await copy_message(msg,cl[x[0]],to,ct) #copying the message to the destination chat
-                        lid = msg.id #if the message was copied without error, this line runs to update the ID of the last copied message
-                        #logging.info('copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
-                    except errors.FloodWaitError as e:
-                        te = time.time() #the current time at which the floodwait has occurred
-                        wait = e.seconds #the required wait time
-                        w[x[0]] = [wait,te]
-                        await move(x,w,ct,id=msg.id,f=True) #move to the next client
-                        msg.message = bmsg #restore the message from the backup, as its text may have been modified with a caption by copy_message(...)
-                        c[0] = 1 #reset the counter to 1 for the next client
-                        continue #continue to the next iteration of the while loop
-                    except errors.rpcerrorlist.MediaEmptyError:
-                        if ct == 'user': #if the client that's encountered the MediaEmptyError is a user
-                            logging.info('A MediaEmptyError was encountered with user client {0} when trying to send message {1}. Check that it has access to the source chat and/or check the media object.'.format(x[0]+1,msg.id))
-                            logging.info('ID of last copied message of stream {0} = {1}'.format(i+1,lid))
-                            restart(i,msg.id) #restart the script
-                        #logging.info('moving to user client to copy message {}'.format(msg.id))
-                        await movec(c,m,t,x,w,ct) #increment the counter for bot clients or move to the next bot client if it's reached the maximum
-                        #switch to user client
-                        ct = 'user'
-                        x = xu
-                        cl = l
-                        w = wu
-                        c = cu
-                        t = tu
-                        m = 50
-                        msg.message = bmsg #restore the message's text from the backup copy in case it's been modified when adding the caption
-                        await asyncio.sleep(sl)
-                        continue #to the next iteration of the while loop to try sending the message with a user client this time
-                    except errors.rpcerrorlist.FileReferenceExpiredError:
-                        logging.info('FileReferenceExpiredError encountered on message {}'.format(msg.id))
-                        restart(i,msg.id) #restart the script
-                        #await asyncio.sleep(2)
-                        continue
-                    #logging.info('successfully copied message {0} with {1} client {2}'.format(msg.id,ct,x[0]+1))
-                    break #the 'try:' statement executed successfully and the while loop needs to be broken manually
+                try:
+                    await copy_message(msg,to) #copying the message to the destination chat
+                    lid[0] = msg.id #if the message was copied without error, this line runs to update the ID of the last copied message
+                except errors.rpcerrorlist.FileReferenceExpiredError:
+                    logging.info('FileReferenceExpiredError encountered on message {}'.format(msg.id))
+                    restart(i,msg.id) #restart the script
+                    #await asyncio.sleep(2)
+                    continue
+                #logging.info('successfully copied message {0} with {1} client {2}'.format(msg.id,ct[0],x[0]+1))
                 if p2f:
                     print('',file=file) #a blank line to separate messages
                     print(msg,file=file) #print the message to the file
-                await movec(c,m,t,x,w,ct) #increment the counter or move to the next client if it's reached the maximum
                 #asyncio.sleep(1)
             k += 1
 
