@@ -155,6 +155,32 @@ If the message already has text, then two line breaks are inserted at the end, f
 
 This applies if the text a message already contains wouldn't exceed the limit if the caption was added to it. The limit is 4096 characters for text messages and 1024 characters for the caption of media messages. If it would exceed the limit, the message is instead copied without a caption added to it, and the caption is sent in a new message in reply to the copied message immediately afterwards.
 
+# Messages from Premium subscribers
+Among the features that Telegram Premium offers is the ability to send types of messages that default users can't. These include:
+- [Sending unique animated custom emoji](https://t.me/premium/16)
+- [Sending unique stickers](https://t.me/premium/133)
+- Including a caption on media  messages up to 2048 characters in length, unlike the usual 1024 characters that default users are restricted to (as stated in the in-app Telegram Premium promo, and alluded to [here](https://telegram.org/blog/700-million-and-premium#doubled-limits))
+
+This can result in a problem if you are a default user and are trying to copy a message sent by a Premium user that contains one of these features.
+
+After testing, it appears that default user clients are unable to copy messages with premium stickers, and receive a PREMIUM_ACCOUNT_REQUIRED error when trying to do so. It appears bot clients are able to copy such messages though without receiving an, but the copied stickers appear without their unique animated effects that they have when sent by a Premium user.
+
+Both default user clients and bot clients are able to copy messages with custom emoji without receiving an error, but it doesn't appear with its animated effects in the copied message. Depending on which version of the Telegram app you view them in, they may appear either as boxes containing a question mark or some other regular emoji.
+
+When trying to copy a media message with a caption longer than the default limit, the result is just a MEDIA_CAPTION_TOO_LONG error.
+
+The script has therefore been programmed to do the following:
+
+For premium stickers and custom emoji, the message is just copied like other messages, even if they lose their animated effects. An attempt is first made at copying a message with a bot client before a user client so these messages always get copied by a bot client, and the PREMIUM_ACCOUNT_REQUIRED error is not encountered.
+
+For messages with a character length higher than the default limit, the message is split into multiple separate messages of length no greater than the default limit, but taking care not to break the original message apart in the middle of a word or formatted part of the text, so the message is only split at word boundaries and boundaries of the region over which formatting entities apply, as long as it's possible to do so. If e.g. the entire text of the message is covered in overlapping formatting entities, then it's not possible to split it into parts no longer than the default character limit without breaking a formatted entity apart, so in this case the script doesn't keep the formatted entities intact. In this case the script splits the formatting entity at the boundary and constructs new formatting entities to apply that formatting to the text of each split part, so e.g. if the message contained a hyperlink greater than 1024 characters in length, the text would be split apart midway through but the text in the two new separate parts would each be formatted as a hyperlink to point to the same location as the original hyperlink.
+
+Similarly when the text of the message contains a string of length greater than the default character length and it contains no whitespaces, then the script does break it at a non-whitespace character which may result in words being split apart across the new separate messages.
+
+After splitting the message into separate parts within the default character limit, the first part is sent with the other attributes of the message like the media object or buttons if it had any. The subsequent parts are sent in a chain of replies, each one as a reply to the previous part, up to the first part. the custom caption that the script constructs is either added to the end of the final part if it can do so within the character limit, or it's sent as a separate message in reply to the final part. All parts after the first part are inevitably text messages, so the character limit for text messages (4096 characters) is applied to them rather than the limit for media message captions.
+
+This process works regardless of what the character limit is and the type of message, so if Telegram subsequently allows Premium users to send text messages longer than 4096 characters, then the script is able to handle that too.
+
 # Handling FileReferenceExpiredError and MediaEmptyError with a user client
 
 User clients can also receive a MediaEmptyError, if they haven't joined the channel/group from which messages are being copied, so make sure they have before you start the script.
