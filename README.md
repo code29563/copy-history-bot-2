@@ -56,7 +56,7 @@ The environment variables are to be given in a .env file. An example is shown in
 
 5. Make sure all the user clients have joined the chat/group from which messages are to be copied, and make sure both the user clients and bot clients are admins in the destination chat to which messages are to be copied.
 6. If you want to print the Message object of each successfully copied message to a file, set the PRINT_TO_FILE environment variable to "1". The printed object contains various details of the message not present in the (already detailed) caption.
-7. Run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
+7. Install the requirements if they're not already installed by running ‘pip install -r requirements.txt’, then run the script using 'python app.py'. Note that the RUN environment variable in the .env file is not to be modified by the user.
 
 # Background
 
