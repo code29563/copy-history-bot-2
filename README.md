@@ -11,8 +11,11 @@ The types of source chats the userbot is catered to so far are chats and groups 
   - [Switching between clients and handling floodwaits](#Switching-between-clients-and-handling-floodwaits)
 - [Importance of using multiple clients](#Importance-of-using-multiple-clients)
 - [The caption added to messages](#The-caption-added-to-messages)
+- [Messages from Premium subscribers](#Messages-from-Premium-subscribers)
 - [Handling FileReferenceExpiredError and MediaEmptyError with a user client](#Handling-FileReferenceExpiredError-and-MediaEmptyError-with-a-user-client)
+- [Messages with buttons](#Messages-with-buttons)
 - [Other notes](#Other-notes)
+- [Possible Improvements](#Possible-Improvements)
 
 # Features
 
@@ -139,6 +142,7 @@ Not all messages accept a text component, but those that do include text message
 - The second line is 'message\_ID: ' followed by the ID of the message in the source chat. If the message in the source chanel has been edited since it was first sent there, this is followed by ' (a\_previous\_message\_edited)'.
 - The third line is 'date: ' followed by the date and time at which the message was sent in the source chat, except if the message has been edited since it was first sent, in which case it's the date and time at which the message was last edited instead of that at which it was first sent. The format of the date in both cases is 'YYYY-MM-DD hh:mm:ss UTC' with the time being given in UTC.
 - If the source chat is a group, the next line is 'sender_ID: ' followed by the ID of the sender of the message in the group, which can either be a user/bot, a chat (if it's linked to the group or the message was sent by a user as a chat), or an anonymous group admin (in which case the ID is the group's ID).
+- If the message is a quiz, the next line is 'message_type: quiz', and if it is a poll, the next line is 'message_type: poll'.
 - If the message is a reply to a previous message, the next line is 'in\_reply\_to\_message\_ID: ' followed by the ID of the message to which it was a reply.
 - If the message in the source chat had been forwarded from somewhere else, such that it had a 'Forwarded from: ' tag, then:
   - If the message was forwarded from an anonymous group admin, the next line is 'forwarded\_from\_chat\_ID: {ID} (supergroup)' where {ID} is the ID of the group from which it was forwarded
@@ -177,7 +181,7 @@ For messages with a character length higher than the default limit, the message 
 
 Similarly when the text of the message contains a string of length greater than the default character length and it contains no whitespaces, then the script does break it at a non-whitespace character which may result in words being split apart across the new separate messages.
 
-After splitting the message into separate parts within the default character limit, the first part is sent with the other attributes of the message like the media object or buttons if it had any. The subsequent parts are sent in a chain of replies, each one as a reply to the previous part, up to the first part. the custom caption that the script constructs is either added to the end of the final part if it can do so within the character limit, or it's sent as a separate message in reply to the final part. All parts after the first part are inevitably text messages, so the character limit for text messages (4096 characters) is applied to them rather than the limit for media message captions.
+After splitting the message into separate parts within the default character limit, the first part is sent with the other attributes of the message like the media object or buttons if it had any. The subsequent parts are sent in a chain of replies, each one as a reply to the previous part, up to the first part. The custom caption that the script constructs is either added to the end of the final part if it can do so within the character limit, or it's sent as a separate message in reply to the final part. All parts after the first part are inevitably text messages, so the character limit for text messages (4096 characters) is applied to them rather than the limit for media message captions.
 
 This process works regardless of what the character limit is and the type of message, so if Telegram subsequently allows Premium users to send text messages longer than 4096 characters, then the script is able to handle that too.
 
@@ -195,6 +199,23 @@ To handle both these errors, the script updates the STREAMS environment variable
 User clients can't send messages with inline keyboard buttons as far as I'm aware, so the userbot copies the message without its buttons, and then a bot client is used to edit the copied message and add the buttons to it.
 
 If the buttons in the original message contain a login URL (or authorisation URL), then it's converted to a regular URL first and then included in the copied message. This is because login URLs have to be specifically configured for a bot as far as I'm aware, so if the bot tries to copy a message with a login URL that isn't configured for it, it throws an error.
+
+# Polls and quizzes
+
+Polls and quizzes in Telegram have a particular ID associated with them, and when copying poll or quiz messages, if the process succeeds, the poll/quiz is created anew with a new ID. The votes on the original poll/quiz are not preserved in the copied message.
+
+Additionally, when trying to copy a quiz to which one doesn't have access to the correct answer and explanation of its solution, the error QUIZ_CORRECT_ANSWERS_EMPTY is returned, or some other kind of error in the process of trying to copy it depending on which library etc is being used.
+
+Generally, the correct answer and explanation of a quiz is inaccessible to a user client that hasn't answered the quiz, but I've had variable results with bot clients where occasionally they are accessible. Overall, I've found no reliable pattern on which to base treatment of quizzes in this script.
+
+When forwarding a poll/quiz, the ID of the poll/quiz remains the same in the forwarded message and the votes are preserved and updated as new votes are made on the poll/quiz in the original message. If the original message gets deleted in the source chat, the forwarded message still remains in the destination chat and new votes can still be cast on the poll/quiz there. If the quiz gets closed/stopped in the original message, the correct answer gets shown in both the original and forwarded message too.
+
+To preserve the maximum information available about a poll/quiz, what I've chosen to implement is for the script to forward the original message, and then send the available parameters of the poll/quiz as a text message in reply to the forwarded message, in case the forwarded message ever becomes inaccessible.
+
+For quizzes, if the correct answer and explanation are accessible, then they are also included in this text reply. To access them, the message as retrieved by the user clients is first checked to see if any of them contain the correct answer and explanation (which may be the case if e.g. one of the user clients had answered the quiz), and if not then the script iterates through the list of bot clients, attempting to retrieve the message with each one until it obtains a Message object containing the correct answer and explanation, or all clients are exhausted without success. If an error is encountered on any bot client in the process of trying to retrieve the message, it is skipped. This includes a floodwait error, so the client is skipped instead of waiting out the floodwait and retrying.
+
+I'm not sure if polls/quizzes can have buttons, and I highly doubt they can, but I have catered to the possibility just in case. From experimenting with forwarding messages with buttons, variable results are obtained with the buttons occasionally being forwarded with the message and occasionally not, so the chosen solution is for the script to check whether the forwarded poll/quiz contains buttons (if it had buttons in the first place), and if not then the buttons are instead attached with the text message sent in reply to the forwarded message.
+
 
 # Other notes
 
